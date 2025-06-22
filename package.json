@@ -4,7 +4,7 @@
   "private": true,
   "homepage": "https://96Mayar96.github.io/your-music-frontend",
   "dependencies": {
-    "firebase": "^10.12.3",
+    "firebase": "^10.14.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-scripts": "5.0.1",
