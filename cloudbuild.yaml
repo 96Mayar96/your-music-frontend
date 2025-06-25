@@ -1,0 +1,58 @@
+# cloudbuild.yaml
+# This file defines the steps Google Cloud Build will execute for your frontend deployment.
+# Place this file in the root directory of your 'my-music-frontend' GitHub repository.
+
+steps:
+# Step 1: Install Node.js dependencies for the frontend
+# Uses the 'npm' Cloud Builder image provided by Google.
+# 'dir: '.' ' means the command will run in the root of the connected repository.
+- name: 'gcr.io/cloud-builders/npm'
+  args: ['install']
+  dir: '.'
+
+# Step 2: Build the React application for production
+# This command runs 'npm run build', which creates the optimized 'build/' directory.
+- name: 'gcr.io/cloud-builders/npm'
+  args: ['run', 'build']
+  dir: '.'
+
+# Step 3: Synchronize the 'build' directory to your primary Google Cloud Storage bucket
+# Uses the 'gsutil' Cloud Builder image.
+# '-m' enables parallel uploads for speed.
+# '-r' recursively copies directories.
+# '-d' deletes files in the destination that are no longer in the source (important for cleaning up old build files).
+- name: 'gcr.io/cloud-builders/gsutil'
+  args: ['-m', 'rsync', '-r', '-d', 'build/', 'gs://my-music-app-frontend-musicplayer/']
+  # Make sure 'gs://my-music-app-frontend-musicplayer/' is your correct primary frontend bucket.
+
+# Step 4: Invalidate the Cloud CDN cache for your Load Balancer
+# This is crucial to ensure that users immediately see the updated content
+# and don't get served cached old versions from the CDN.
+# Uses the 'gcloud' Cloud Builder image.
+# 'beatalyst-frontend-lb-v2' is the name of your URL Map for the Load Balancer.
+# '/*' invalidates cache for all paths under that URL Map.
+# '_PROJECT_ID' is an automatic substitution variable provided by Cloud Build.
+- name: 'gcr.io/cloud-builders/gcloud'
+  args:
+    - 'compute'
+    - 'url-maps'
+    - 'invalidate-cdn'
+    - 'beatalyst-frontend-lb-v2' # <<< VERIFY THIS IS YOUR EXACT URL MAP NAME!
+    - '--path'
+    - '/*'
+    - '--project=$_PROJECT_ID'
+
+# Optional: You can add additional steps here if you have other buckets
+# where you want to copy the build files.
+# Keep in mind that for your current setup, only 'my-music-app-frontend-musicplayer'
+# is actively serving your website via the Load Balancer.
+#
+# Example (if you wanted to copy to 'beatalyst.online' and 'www.beatalyst.online' too):
+# - name: 'gcr.io/cloud-builders/gsutil'
+#   args: ['-m', 'rsync', '-r', '-d', 'build/', 'gs://beatalyst.online/']
+# - name: 'gcr.io/cloud-builders/gsutil'
+#   args: ['-m', 'rsync', '-r', '-d', 'build/', 'gs://www.beatalyst.online/']
+
+# Overall build timeout
+# Provides ample time for npm install and build process, especially on first run.
+timeout: '1200s' # 20 minutes
